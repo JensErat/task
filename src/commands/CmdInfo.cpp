@@ -176,7 +176,7 @@ int CmdInfo::execute (std::string& output)
         std::stringstream message;
         std::vector <Task>::const_iterator it;
         for (it = blocking.begin (); it != blocking.end (); ++it)
-          message << it->id << " " << it->get ("description") << "\n";
+          message << it->id << " " << it->get ("description") << " (" << format (it->urgency_c(), 5, 4) << ")\n";
 
         row = view.addRow ();
         view.set (row, 0, STRING_CMD_INFO_BLOCKING);
@@ -393,6 +393,7 @@ int CmdInfo::execute (std::string& output)
 
     // Create a second table, containing urgency details, if necessary.
     ViewText urgencyDetails;
+    float sum = 0.0;
     if (task->urgency () != 0.0)
     {
       if (context.color ())
@@ -413,17 +414,17 @@ int CmdInfo::execute (std::string& output)
       urgencyDetails.add (Column::factory ("string", "")); // =
       urgencyDetails.add (Column::factory ("string", "")); // Result
 
-      urgencyTerm (urgencyDetails, "project",     task->urgency_project (),     Task::urgencyProjectCoefficient);
-      urgencyTerm (urgencyDetails, "active",      task->urgency_active (),      Task::urgencyActiveCoefficient);
-      urgencyTerm (urgencyDetails, "scheduled",   task->urgency_scheduled (),   Task::urgencyScheduledCoefficient);
-      urgencyTerm (urgencyDetails, "waiting",     task->urgency_waiting (),     Task::urgencyWaitingCoefficient);
-      urgencyTerm (urgencyDetails, "blocked",     task->urgency_blocked (),     Task::urgencyBlockedCoefficient);
-      urgencyTerm (urgencyDetails, "blocking",    task->urgency_blocking (),    Task::urgencyBlockingCoefficient);
-      urgencyTerm (urgencyDetails, "annotations", task->urgency_annotations (), Task::urgencyAnnotationsCoefficient);
-      urgencyTerm (urgencyDetails, "tags",        task->urgency_tags (),        Task::urgencyTagsCoefficient);
-      urgencyTerm (urgencyDetails, "next",        task->urgency_next (),        Task::urgencyNextCoefficient);
-      urgencyTerm (urgencyDetails, "due",         task->urgency_due (),         Task::urgencyDueCoefficient);
-      urgencyTerm (urgencyDetails, "age",         task->urgency_age (),         Task::urgencyAgeCoefficient);
+      sum += urgencyTerm (urgencyDetails, "project",     task->urgency_project (),     Task::urgencyProjectCoefficient);
+      sum += urgencyTerm (urgencyDetails, "active",      task->urgency_active (),      Task::urgencyActiveCoefficient);
+      sum += urgencyTerm (urgencyDetails, "scheduled",   task->urgency_scheduled (),   Task::urgencyScheduledCoefficient);
+      sum += urgencyTerm (urgencyDetails, "waiting",     task->urgency_waiting (),     Task::urgencyWaitingCoefficient);
+      sum += urgencyTerm (urgencyDetails, "blocked",     task->urgency_blocked (),     Task::urgencyBlockedCoefficient);
+      sum += urgencyTerm (urgencyDetails, "blocking",    task->urgency_blocking (),    Task::urgencyBlockingCoefficient);
+      sum += urgencyTerm (urgencyDetails, "annotations", task->urgency_annotations (), Task::urgencyAnnotationsCoefficient);
+      sum += urgencyTerm (urgencyDetails, "tags",        task->urgency_tags (),        Task::urgencyTagsCoefficient);
+      sum += urgencyTerm (urgencyDetails, "next",        task->urgency_next (),        Task::urgencyNextCoefficient);
+      sum += urgencyTerm (urgencyDetails, "due",         task->urgency_due (),         Task::urgencyDueCoefficient);
+      sum += urgencyTerm (urgencyDetails, "age",         task->urgency_age (),         Task::urgencyAgeCoefficient);
 
       // Tag, Project- and UDA-specific coefficients.
       std::map <std::string, float>::iterator var;
@@ -438,7 +439,7 @@ int CmdInfo::execute (std::string& output)
           {
             std::string project = var->first.substr (21, end - 21);
             if (task->get ("project").find (project) == 0)
-              urgencyTerm (urgencyDetails, "PROJECT " + project, 1.0, var->second);
+              sum += urgencyTerm (urgencyDetails, "PROJECT " + project, 1.0, var->second);
           }
 
           // urgency.user.tag.<tag>.coefficient
@@ -447,7 +448,7 @@ int CmdInfo::execute (std::string& output)
           {
             std::string name = var->first.substr (17, end - 17);
             if (task->hasTag (name))
-              urgencyTerm (urgencyDetails, "TAG " + name, 1.0, var->second);
+              sum += urgencyTerm (urgencyDetails, "TAG " + name, 1.0, var->second);
           }
 
           // urgency.user.keyword.<keyword>.coefficient
@@ -456,7 +457,7 @@ int CmdInfo::execute (std::string& output)
           {
             std::string keyword = var->first.substr (21, end - 21);
             if (task->get ("description").find (keyword) != std::string::npos)
-              urgencyTerm (urgencyDetails, "KEYWORD " + keyword, 1.0, var->second);
+              sum += urgencyTerm (urgencyDetails, "KEYWORD " + keyword, 1.0, var->second);
           }
         }
 
@@ -474,13 +475,13 @@ int CmdInfo::execute (std::string& output)
             {
               // urgency.uda.<name>.coefficient
               if (task->has (uda))
-                urgencyTerm (urgencyDetails, std::string ("UDA ") + uda, 1.0, var->second);
+                sum += urgencyTerm (urgencyDetails, std::string ("UDA ") + uda, 1.0, var->second);
             }
             else
             {
               // urgency.uda.<name>.<value>.coefficient
               if (task->get (uda.substr(0, dot)) == uda.substr(dot+1))
-                urgencyTerm (urgencyDetails, std::string ("UDA ") + uda, 1.0, var->second);
+                sum += urgencyTerm (urgencyDetails, std::string ("UDA ") + uda, 1.0, var->second);
             }
           }
         }
@@ -489,7 +490,7 @@ int CmdInfo::execute (std::string& output)
       row = urgencyDetails.addRow ();
       urgencyDetails.set (row, 5, rightJustify ("------", 6));
       row = urgencyDetails.addRow ();
-      urgencyDetails.set (row, 5, rightJustify (format (task->urgency (), 4, 4), 6));
+      urgencyDetails.set (row, 5, rightJustify (format (sum, 4, 4), 6));
     }
 
     // Create a third table, containing undo log change details.
@@ -550,9 +551,13 @@ int CmdInfo::execute (std::string& output)
         << view.render ()
         << "\n";
 
-    if (urgencyDetails.rows () > 0)
+    if (urgencyDetails.rows () > 0) {
       out << urgencyDetails.render ()
           << "\n";
+      if (sum != task->urgency_c ())
+        out << "    Higher urgency inherited from blocked task.\n";
+      out << "\n";
+    }
 
     if (journal.rows () > 0)
       out << journal.render ()
@@ -564,7 +569,7 @@ int CmdInfo::execute (std::string& output)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-void CmdInfo::urgencyTerm (
+float CmdInfo::urgencyTerm (
   ViewText& view,
   const std::string& label,
   float measure,
@@ -581,6 +586,7 @@ void CmdInfo::urgencyTerm (
     view.set (row, 4, "=");
     view.set (row, 5, rightJustify (format (value, 5, 3), 6));
   }
+  return value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

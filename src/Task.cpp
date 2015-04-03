@@ -1713,6 +1713,8 @@ float Task::urgency_c () const
       }
     }
   }
+
+  value = std::max (urgency_inherit (), value);
 #endif
 
   return value;
@@ -1743,10 +1745,10 @@ float Task::urgency_inherit () const
   std::vector <Task> blocked;
   dependencyGetBlocked (*this, blocked);
 
-  float v = 0.0;
+  float maximum = 0.0;
   std::vector <Task>::const_iterator it;
   for (it = blocked.begin (); it != blocked.end (); ++it)
-  {
+  /*{
     // urgency_blocked, _blocking, _project and _tags left out.
     v += it->urgency_active ();
     v += it->urgency_age ();
@@ -1758,9 +1760,10 @@ float Task::urgency_inherit () const
 
     // Inherit from all parent tasks in the dependency chain recursively.
     v += it->urgency_inherit ();
-  }
+  }*/ // TODO provide as alternative
+    maximum = std::max ({maximum, it->urgency_c (), it->urgency_inherit ()});
 
-  return v;
+  return maximum;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

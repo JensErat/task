@@ -38,7 +38,7 @@ public:
   int execute (std::string&);
 
 private:
-  void urgencyTerm (ViewText&, const std::string&, float, float) const;
+  float urgencyTerm (ViewText&, const std::string&, float, float) const;
 };
 
 #endif
